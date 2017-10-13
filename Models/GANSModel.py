@@ -58,7 +58,6 @@ class GANSModel:
         self.net.layer_opts['conv2D_bName'] = 'conv2_b'
         self.net.layer['conv2'] = ConvLayer(self.net, self.net.layer['unpool2'].output)
 
-        self.params = self.net.layer['conv1'] + \
-                      self.net.layer['conv2'] + \
-                      self.net.layer['fc1'] + \
-                      self.net.layer['fc2']
+        self.params = self.net.layer['fc1'].params + \
+                      self.net.layer['conv1'].params + \
+                      self.net.layer['conv2'].params
