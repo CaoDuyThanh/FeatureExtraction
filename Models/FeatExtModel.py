@@ -33,7 +33,7 @@ class FEAEXTModel():
 
         # ----- Feature Extraction Model -----
         self.pred_net = CNNModel(_input  = _gens,
-                                 _params = _gens_params)
+                                 _params = _feature_params)
         _pred_probs   = self.pred_net.net.layer['prob'].output
 
 
@@ -43,14 +43,14 @@ class FEAEXTModel():
         _feature_grads = T.grad(_feature_cost, _feature_params)
 
         # ----- Optimizer -----
-        _feature_optimizer = AdamGDUpdate(self.featext_net, params = _feature_params, grads = _feature_grads)
+        _feature_optimizer = AdamGDUpdate(self.featext_net.net, params = _feature_params, grads = _feature_grads)
 
         # ----- Gens Cost -----
         _gens_cost  = T.mean(T.log(1 - _pred_probs[T.arange(1, self.batch_size), self.Y]))
         _gens_grads = T.grad(_gens_cost, _gens_params)
 
         # ----- Optimizer -----
-        _gens_optimizer = AdamGDUpdate(self.featext_net, params = _gens_params, grads = _gens_grads)
+        _gens_optimizer = AdamGDUpdate(self.featext_net.net, params = _gens_params, grads = _gens_grads)
 
 
         # ===== Function =====
