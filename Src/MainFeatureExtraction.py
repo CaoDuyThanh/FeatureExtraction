@@ -34,9 +34,10 @@ BATCH_SIZE         = 16
 NUM_EPOCH          = 100
 MAX_ITERATION      = 100000
 LEARNING_RATE      = 0.001      # Starting learning rate
-DISPLAY_FREQUENCY  = 100;       INFO_DISPLAY = '\r%sLearning rate = %f - Epoch = %d - Iter = %d - Cost = %f - Best cost = %f - Best prec = %f - Mags = %f'
+DISPLAY_FREQUENCY  = 100;       INFO_DISPLAY = '\r%sLearning rate = %f - Epoch = %d - Iter = %d - Costf = %f - Costg = %f'
 SAVE_FREQUENCY     = 2000
 VALIDATE_FREQUENCY = 2000
+GENERATE_SAMPLE    = 1000
 
 # DATASET CONFIGURATION
 DATASET_PATH    = 'C:/Users/CaoDuyThanh/Downloads/Project/Dataset/MNIST/mnist.pkl.gz'
@@ -99,18 +100,16 @@ def _train_model():
 
     # ===== Load data record =====
     print ('|-- Load previous record !')
-    iter_train_record = []
-    cost_train_record = []
-    iter_valid_record = []
-    cost_valid_record = []
-    best_valid_cost   = 10000
+    iter_train_record  = []
+    costf_train_record = []
+    costg_train_record = []
+    best_valid_cost    = 10000
     if check_file_exist(RECORD_PATH, _throw_error = False):
         _file = open(RECORD_PATH)
-        iter_train_record = pickle.load(_file)
-        cost_train_record = pickle.load(_file)
-        iter_valid_record = pickle.load(_file)
-        cost_valid_record = pickle.load(_file)
-        best_valid_cost   = pickle.load(_file)
+        iter_train_record  = pickle.load(_file)
+        costf_train_record = pickle.load(_file)
+        costg_train_record = pickle.load(file)
+        best_valid_cost    = pickle.load(_file)
         _file.close()
     print ('|-- Load previous record ! Completed !')
 
@@ -124,14 +123,14 @@ def _train_model():
 
     # ===== Training start =====
     # ----- Temporary record -----
-    _costs = []
-    _mags  = []
+    _costsf = []
+    _costsg = []
     _epoch = START_EPOCH
     _iter  = START_ITERATION
     _learning_rate = LEARNING_RATE
 
     # ----- Train -----
-    for _epoch in xrange(START_EPOCH, NUM_EPOCH):
+    while _epoch < NUM_EPOCH:
         _idx = range(len(train_set_x))
         random.shuffle(_idx)
         train_set_x = train_set_x[_idx,]
@@ -153,7 +152,7 @@ def _train_model():
                                                       _train_batch_x,
                                                       _train_batch_y)
                 _feat_batch.append(result[0])
-            _feat_mean = numpy.mean(_feat_batch)
+            _costsf.append(numpy.mean(_feat_batch))
 
             _train_batch_x = train_set_x[_id_batch_trained_data * BATCH_SIZE :
                                         (_id_batch_trained_data + 1) * BATCH_SIZE, ]
@@ -164,20 +163,18 @@ def _train_model():
                                                   _learning_rate,
                                                   _train_batch_x,
                                                   _train_batch_y)
-
             # Temporary save info
-            _costs.append(result[0])
+            _costsf.append(result[0])
             _train_end_time = timeit.default_timer()
             # Print information
-            print '\r|-- Trained %d / %d batch - Time = %f' % (_num_batch_trained_data, _num_batch_train_data, _train_end_time - _train_start_time),
+            print '\r|-- Trained %d / %d batch - Time = %f' % (_id_batch_trained_data, _num_batch_train_data, _train_end_time - _train_start_time),
 
             if _iter % SAVE_FREQUENCY == 0:
                 # Save record
                 _file = open(RECORD_PATH, 'wb')
                 pickle.dump(iter_train_record, _file, 2)
-                pickle.dump(cost_train_record, _file, 2)
-                pickle.dump(iter_valid_record, _file, 2)
-                pickle.dump(cost_valid_record, _file, 2)
+                pickle.dump(costf_train_record, _file, 2)
+                pickle.dump(costg_train_record, _file, 2)
                 pickle.dump(best_valid_cost, _file, 2)
                 _file.close()
                 print ('+ Save record ! Completed !')
@@ -190,11 +187,19 @@ def _train_model():
 
             if _iter % DISPLAY_FREQUENCY == 0:
                 # Print information of current training in progress
-                print (INFO_DISPLAY % ('|-- ', _learning_rate, _epoch, _iter, numpy.mean(_costs), best_valid_cost, best_valid_prec, numpy.mean(_mags)))
+                print (INFO_DISPLAY % ('|-- ', _learning_rate, _epoch, _iter, numpy.mean(_costsf), numpy.mean(_costsg)))
                 iter_train_record.append(_iter)
-                cost_train_record.append(numpy.mean(_costs))
-                _costs = []
-                _mags  = []
+                costf_train_record.append(numpy.mean(_costsf))
+                costg_train_record.append(numpy.mean(_costsg))
+                _costsf  = []
+                _costsg  = []
+
+            if _iter % GENERATE_SAMPLE == 0:
+                sample_batch = FEAEXT_model.gens_gen_img_func(VALID_STATE,
+                                                              _train_batch_x)
+                for (sample, label) in zip(sample_batch, _train_batch_y):
+                    _file_name = '/sample/%d.jpg' % label
+                    cv2.imwrite(_file_name, sample)
 
             # if _iter % VALIDATE_FREQUENCY == 0:
             #     print ('------------------- Validate Model -------------------')
