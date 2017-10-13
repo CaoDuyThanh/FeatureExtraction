@@ -39,7 +39,7 @@ SAVE_FREQUENCY     = 2000
 VALIDATE_FREQUENCY = 2000
 
 # DATASET CONFIGURATION
-DATASET_PATH    = '/media/badapple/Data/PROJECTS/MachineLearning/Dataset/MNIST/mnist.pkl.gz'
+DATASET_PATH    = 'C:/Users/CaoDuyThanh/Downloads/Project/Dataset/MNIST/mnist.pkl.gz'
 
 START_EPOCH     = 0
 START_ITERATION = 0
@@ -96,11 +96,6 @@ def _train_model():
     train_set_y = dataset.train_set_y
     test_set_x  = dataset.test_set_x
     test_set_y  = dataset.test_set_y
-
-    # ----- Shuffle data -----
-    random.seed(123456)
-
-    # ----- Divide into TRAIN|VALID|TEST set -----
 
     # ===== Load data record =====
     print ('|-- Load previous record !')
@@ -160,10 +155,10 @@ def _train_model():
                 _feat_batch.append(result[0])
             _feat_mean = numpy.mean(_feat_batch)
 
-            _train_batch_x = train_set_x[_id_batch_trained_feat * BATCH_SIZE :
-                                        (_id_batch_trained_feat + 1) * BATCH_SIZE, ]
-            _train_batch_y = train_set_y[_id_batch_trained_feat * BATCH_SIZE :
-                                        (_id_batch_trained_feat + 1) * BATCH_SIZE, ]
+            _train_batch_x = train_set_x[_id_batch_trained_data * BATCH_SIZE :
+                                        (_id_batch_trained_data + 1) * BATCH_SIZE, ]
+            _train_batch_y = train_set_y[_id_batch_trained_data * BATCH_SIZE :
+                                        (_id_batch_trained_data + 1) * BATCH_SIZE, ]
             _iter += 1
             result = FEAEXT_model.gens_train_func(TRAIN_STATE,
                                                   _learning_rate,
