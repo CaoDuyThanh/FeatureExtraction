@@ -70,6 +70,10 @@ class FEAEXTModel():
                                                updates = _gens_optimizer.updates,
                                                outputs = [_gens_cost])
 
+        self.gens_gen_img_func = theano.function(inputs  = [self.featext_net.net.layer['fc1_drop'].state,
+                                                            self.X],
+                                                 outputs = [_gens])
+
 
     def create_func(self,
                     _layer_name):
