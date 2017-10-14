@@ -14,7 +14,7 @@ class FEAEXTModel():
         self.Y = T.ivector('Y')
 
         # ===== Extract Info =====
-        self.batch_size = self.X.shape[0]
+        self.batch_size = self.Y.shape[0]
 
         # ===== Create model =====
         # ----- Feature Extraction Model -----
@@ -28,7 +28,7 @@ class FEAEXTModel():
 
         # ----- GANs Model -----
         self.gans_net = GANSModel(_input = _feature)
-        _gens         = self.gans_net.net.layer['conv2'].output
+        _gens         = self.gans_net.net.layer['sig1'].output
         _gens_params  = self.gans_net.params
 
         # ----- Feature Extraction Model -----
@@ -39,19 +39,23 @@ class FEAEXTModel():
 
         # ===== Cost function =====
         # ----- Featext Cost -----
-        _feature_cost  = T.mean(T.log(_feature_probs[T.arange(1, self.batch_size), self.Y]))
-        _feature_grads = T.grad(_feature_cost, _feature_params)
+        _true_feat  = _feature_probs[ : self.batch_size, ]
+        _noise_feat = _feature_probs[-self.batch_size:, ]
+        _feature_cost  = (-T.mean(T.log(_true_feat[T.arange(self.batch_size), self.Y])) \
+                          -T.mean(T.log(1 - _noise_feat[T.arange(self.batch_size), self.Y]))) / 2
+        _feature_grads =  T.grad(_feature_cost, _feature_params)
 
         # ----- Optimizer -----
         _feature_optimizer = AdamGDUpdate(self.featext_net.net, params = _feature_params, grads = _feature_grads)
+        self.feature_optimizer = _feature_optimizer
 
         # ----- Gens Cost -----
-        _gens_cost  = T.mean(T.log(1 - _pred_probs[T.arange(1, self.batch_size), self.Y]))
-        _gens_grads = T.grad(_gens_cost, _gens_params)
+        _gens_cost  = -T.mean(T.log(_pred_probs[T.arange(self.batch_size), self.Y]))
+        _gens_grads =  T.grad(_gens_cost, _gens_params)
 
         # ----- Optimizer -----
         _gens_optimizer = AdamGDUpdate(self.featext_net.net, params = _gens_params, grads = _gens_grads)
-
+        self.gens_optimizer = _gens_optimizer
 
         # ===== Function =====
         # ----- Featext function -----
@@ -62,38 +66,46 @@ class FEAEXTModel():
                                                updates = _feature_optimizer.updates,
                                                outputs = [_feature_cost])
 
+        self.feat_ext_func = theano.function(inputs  = [self.X],
+                                             outputs = [_feature])
+
         # ----- Gens function -----
-        self.gens_train_func = theano.function(inputs  = [self.featext_net.net.layer['fc1_drop'].state,
+        self.gens_train_func = theano.function(inputs  = [self.pred_net.net.layer['fc1_drop'].state,
                                                           _gens_optimizer.learning_rate,
                                                           self.X,
                                                           self.Y],
                                                updates = _gens_optimizer.updates,
                                                outputs = [_gens_cost])
 
-        self.gens_gen_img_func = theano.function(inputs  = [self.featext_net.net.layer['fc1_drop'].state,
-                                                            self.X],
-                                                 outputs = [_gens])
+        self.gens_gen_img_func1 = theano.function(inputs  = [self.X],
+                                                  outputs = [_gens])
+
+        self.gens_gen_img_func = theano.function(inputs  = [self.X],
+                                                 outputs = [_gens.dimshuffle([0, 2, 3, 1])])
 
 
-    def create_func(self,
-                    _layer_name):
-        return theano.function(inputs  = [self.X],
-                               outputs = [self.net.layer[_layer_name].output])
+    def load_model(self,
+                   _file):
+        self.featext_net.load_model(_file)
+        self.gans_net.load_model(_file)
 
-    def load_caffe_model(self,
-                         _caffe_prototxt_path,
-                         _caffe_model_path):
-        self.net.load_caffe_model(_caffe_prototxt_path, _caffe_model_path)
+    def save_model(self,
+                   _file):
+        self.featext_net.save_model(_file)
+        self.gans_net.save_model(_file)
 
-    def load_batch_norm(self,
-                        _file):
-        self.net.layer['conv4_3_norm_batch_norm'].load_model(_file)
-        self.net.layer['relu7_batch_norm'].load_model(_file)
-        self.net.layer['conv6_2_relu_batch_norm'].load_model(_file)
-        self.net.layer['conv7_2_relu_batch_norm'].load_model(_file)
-        self.net.layer['conv8_2_relu_batch_norm'].load_model(_file)
-        self.net.layer['pool6_batch_norm'].load_model(_file)
+    def load_state(self,
+                   _file):
+        self.featext_net.load_model(_file)
+        self.gans_net.load_model(_file)
+        self.feature_optimizer.load_model(_file)
+        self.gens_optimizer.load_model(_file)
 
-    def test_network(self,
-                     _im):
-        return self.feat_func(_im)[0][0], self.pred_func(_im)
+    def save_state(self,
+                   _file):
+        self.featext_net.save_model(_file)
+        self.gans_net.save_model(_file)
+        self.feature_optimizer.save_model(_file)
+        self.gens_optimizer.save_model(_file)
+
+

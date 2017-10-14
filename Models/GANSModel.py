@@ -34,7 +34,7 @@ class GANSModel:
 
         # ----- Stack 2 -----
         # --- Unpool ---
-        self.net.layer_opts['unpool_filter_size'] = (2, 2)
+        self.net.layer_opts['unpool_filter_size'] = (1, 1, 2, 2)
         self.net.layer['unpool1']                 = Unpool2DLayer(self.net, self.net.layer['fc1_re'].output)
 
         # --- Transposed Convolution ---
@@ -47,7 +47,7 @@ class GANSModel:
 
         # ----- Stack 3 -----
         # --- Unpool ---
-        self.net.layer_opts['unpool_filter_size'] = (2, 2)
+        self.net.layer_opts['unpool_filter_size'] = (1, 1, 2, 2)
         self.net.layer['unpool2']                 = Unpool2DLayer(self.net, self.net.layer['conv1'].output)
 
         # --- Transposed Convolution ---
@@ -58,6 +58,15 @@ class GANSModel:
         self.net.layer_opts['conv2D_bName'] = 'conv2_b'
         self.net.layer['conv2'] = ConvLayer(self.net, self.net.layer['unpool2'].output)
 
+        # --- Sigmoid ---
+        self.net.layer['sig1'] = SigmoidLayer(self.net.layer['conv2'].output)
+
         self.params = self.net.layer['fc1'].params + \
                       self.net.layer['conv1'].params + \
                       self.net.layer['conv2'].params
+
+    def save_model(self, file):
+        [pickle.dump(param.get_value(borrow = True), file, 2) for param in self.params]
+
+    def load_model(self, file):
+        [param.set_value(cPickle.load(file), borrow = True) for param in self.params]

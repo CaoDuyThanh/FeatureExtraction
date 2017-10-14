@@ -3,6 +3,8 @@ import math
 import random
 import thread
 import timeit
+import theano
+import theano.tensor as T
 import gzip
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -31,16 +33,16 @@ RECORD_PATH = 'FEAEXT_record.pkl'
 TRAIN_STATE        = 1    # Training state
 VALID_STATE        = 0    # Validation state
 BATCH_SIZE         = 16
-NUM_EPOCH          = 100
+NUM_EPOCH          = 1000
 MAX_ITERATION      = 100000
-LEARNING_RATE      = 0.001      # Starting learning rate
-DISPLAY_FREQUENCY  = 100;       INFO_DISPLAY = '\r%sLearning rate = %f - Epoch = %d - Iter = %d - Costf = %f - Costg = %f'
-SAVE_FREQUENCY     = 2000
-VALIDATE_FREQUENCY = 2000
-GENERATE_SAMPLE    = 1000
+LEARNING_RATE      = 0.00001      # Starting learning rate
+DISPLAY_FREQUENCY  = 10;       INFO_DISPLAY = '\r%sLearning rate = %f - Epoch = %d - Iter = %d - Costf = %f - Costg = %f'
+SAVE_FREQUENCY     = 10000
+VALIDATE_FREQUENCY = 500
+GENERATE_SAMPLE    = 100
 
 # DATASET CONFIGURATION
-DATASET_PATH    = 'C:/Users/CaoDuyThanh/Downloads/Project/Dataset/MNIST/mnist.pkl.gz'
+DATASET_PATH    = '/media/badapple/Data/PROJECTS/MachineLearning/Dataset/MNIST/mnist.pkl.gz'
 
 START_EPOCH     = 0
 START_ITERATION = 0
@@ -108,7 +110,7 @@ def _train_model():
         _file = open(RECORD_PATH)
         iter_train_record  = pickle.load(_file)
         costf_train_record = pickle.load(_file)
-        costg_train_record = pickle.load(file)
+        costg_train_record = pickle.load(_file)
         best_valid_cost    = pickle.load(_file)
         _file.close()
     print ('|-- Load previous record ! Completed !')
@@ -137,14 +139,20 @@ def _train_model():
         train_set_y = train_set_y[_idx,]
         _num_batch_trained_data = len(train_set_x) // BATCH_SIZE
 
+        _epoch += 1
         for _id_batch_trained_data in range(_num_batch_trained_data):
             _feat_batch = []
-            for i in range(100):
-                _id_batch_trained_feat = random(_num_batch_trained_data)
-                _train_batch_x = train_set_x[ _id_batch_trained_feat * BATCH_SIZE :
+            _train_start_time = timeit.default_timer()
+            for i in range(20):
+                _id_batch_trained_feat = random.randint(0, _num_batch_trained_data)
+                _true_batch_x = train_set_x[ _id_batch_trained_feat * BATCH_SIZE :
                                              (_id_batch_trained_feat + 1) * BATCH_SIZE,]
-                _train_batch_y = train_set_y[ _id_batch_trained_feat * BATCH_SIZE :
+                _true_batch_y = train_set_y[ _id_batch_trained_feat * BATCH_SIZE :
                                              (_id_batch_trained_feat + 1) * BATCH_SIZE, ]
+
+                _noise_batch_x = FEAEXT_model.gens_gen_img_func1(_true_batch_x)[0]
+                _train_batch_x = numpy.concatenate((_true_batch_x, _noise_batch_x), axis = 0)
+                _train_batch_y = _true_batch_y
 
                 # Update
                 result = FEAEXT_model.feat_train_func(TRAIN_STATE,
@@ -164,10 +172,10 @@ def _train_model():
                                                   _train_batch_x,
                                                   _train_batch_y)
             # Temporary save info
-            _costsf.append(result[0])
+            _costsg.append(result[0])
             _train_end_time = timeit.default_timer()
             # Print information
-            print '\r|-- Trained %d / %d batch - Time = %f' % (_id_batch_trained_data, _num_batch_train_data, _train_end_time - _train_start_time),
+            print '\r|-- Trained %d / %d batch - Time = %f' % (_id_batch_trained_data, _num_batch_trained_data, _train_end_time - _train_start_time),
 
             if _iter % SAVE_FREQUENCY == 0:
                 # Save record
@@ -195,24 +203,44 @@ def _train_model():
                 _costsg  = []
 
             if _iter % GENERATE_SAMPLE == 0:
-                sample_batch = FEAEXT_model.gens_gen_img_func(VALID_STATE,
-                                                              _train_batch_x)
-                for (sample, label) in zip(sample_batch, _train_batch_y):
-                    _file_name = '/sample/%d.jpg' % label
-                    cv2.imwrite(_file_name, sample)
+                _temp_batch_x = numpy.transpose(_train_batch_x, (0, 2, 3, 1))
+                sample_batch = FEAEXT_model.gens_gen_img_func(_train_batch_x)[0]
+                for (sample, origin, label) in zip(sample_batch, _temp_batch_x, _train_batch_y):
+                    _file_name = './sample/%d.jpg' % label
+                    cv2.imwrite(_file_name, sample * 255)
 
-            # if _iter % VALIDATE_FREQUENCY == 0:
-            #     print ('------------------- Validate Model -------------------')
-            #     _cost_valid, _prec_valid, _valid_pre_extract = _valid_model(_dataset     = dataset,
-            #                                                                 _valid_data  = valid_data,
-            #                                                                 _pre_extract = _valid_pre_extract,
-            #                                                                 _batch_size  = 1)
-            #     iter_valid_record.append(_iter)
-            #     cost_valid_record.append(_cost_valid)
-            #     print ('\n+ Validate model finished! Cost = %f - Prec = %f' % (_cost_valid, _prec_valid))
-            #     print ('------------------- Validate Model (Done) -------------------')
-            #
-            #     # # Save model if its cost better than old one
+                    _file_name = './sample/o_%d.jpg' % label
+                    cv2.imwrite(_file_name, origin * 255)
+
+            if _iter % VALIDATE_FREQUENCY == 0:
+                # print ('------------------- Validate Model -------------------')
+                # _cost_valid, _prec_valid, _valid_pre_extract = _valid_model(_dataset     = dataset,
+                #                                                             _valid_data  = valid_data,
+                #                                                             _pre_extract = _valid_pre_extract,
+                #                                                             _batch_size  = 1)
+                # iter_valid_record.append(_iter)
+                # cost_valid_record.append(_cost_valid)
+                # print ('\n+ Validate model finished! Cost = %f - Prec = %f' % (_cost_valid, _prec_valid))
+                # print ('------------------- Validate Model (Done) -------------------')
+
+                _num_batch_tested_data = len(test_set_x) // BATCH_SIZE
+                _id_batch_tested_data  = random.randint(0, _num_batch_tested_data)
+                _test_batch_x = test_set_x[ _id_batch_tested_data * BATCH_SIZE:
+                                           (_id_batch_tested_data + 1) * BATCH_SIZE, ]
+                _test_batch_y = test_set_y[ _id_batch_tested_data * BATCH_SIZE:
+                                           (_id_batch_tested_data + 1) * BATCH_SIZE, ]
+                _temp_batch_x = numpy.transpose(_test_batch_x, (0, 2, 3, 1))
+
+                sample_batch = FEAEXT_model.gens_gen_img_func(_test_batch_x)[0]
+                for (sample, origin, label) in zip(sample_batch, _temp_batch_x, _test_batch_y):
+                    _file_name = './sample/%d.jpg' % label
+                    cv2.imwrite(_file_name, sample * 255)
+
+                    _file_name = './sample/o_%d.jpg' % label
+                    cv2.imwrite(_file_name, origin * 255)
+
+
+                    # # Save model if its cost better than old one
                 # if (_prec_valid > best_valid_prec):
                 #     best_valid_prec = _prec_valid
                 #
@@ -231,31 +259,66 @@ def _train_model():
                 #     _file.close()
                 #     print ('+ Save best cost model ! Complete !')
 
+import pqkmeans
 def _test_model():
     global dataset, \
            FEAEXT_model
-    # ===== Prepare dataset =====
-    # ----- Get all data and devide into TRAIN | VALID | TEST set -----
-
-    # ----- Shuffle data -----
-
-    # ----- Divide into TRAIN|VALID|TEST set -----
-
     print ('------------------- Test Model -------------------')
     # ===== Load best state =====
     print ('|-- Load best model !')
-    if check_file_exist(BEST_PREC_PATH, _throw_error=False):
-        _file = open(BEST_PREC_PATH)
+    if check_file_exist(STATE_PATH, _throw_error = False):
+        _file = open(STATE_PATH)
         FEAEXT_model.load_model(_file)
         _file.close()
     print ('|-- Load best model ! Completed !')
 
-    _test_pre_extract = dict()
-    _cost_test, _prec_test, _test_pre_extract = _valid_model(_dataset     = dataset,
-                                                             _valid_data  = test_data,
-                                                             _pre_extract = _test_pre_extract,
-                                                             _batch_size  = 1)
-    print ('\n+ Test model finished! Cost = %f - Prec = %f' % (_cost_test, _prec_test))
+    # ===== Create feature =====
+    test_set_x = dataset.all_set_x
+    test_set_y = dataset.all_set_y
+    features   = []
+    _num_batch_test_data = len(test_set_x) // BATCH_SIZE
+    for _id_batch_tested_data in range(_num_batch_test_data):
+        _test_batch_x = test_set_x[_id_batch_tested_data * BATCH_SIZE:
+                                  (_id_batch_tested_data + 1) * BATCH_SIZE, ]
+        result = FEAEXT_model.feat_ext_func(_test_batch_x)
+        features.append(result[0])
+    features = numpy.concatenate(tuple(features), axis = 0)
+    encoder  = pqkmeans.encoder.PQEncoder(num_subdim = 4, Ks = 256)
+    encoder.fit(features)
+    X_pqcode  = encoder.transform(features)
+    kmeans    = pqkmeans.clustering.PQKMeans(encoder = encoder, k = 10)
+    clustered = kmeans.fit_predict(X_pqcode)
+    clustered = numpy.asarray(clustered, dtype = 'int32')
+    right = 0
+    labels_set = []
+    pred_set   = []
+    for l in range(10):
+        idx = numpy.where(clustered == l)
+        sub_clustered = clustered[idx,]
+        sub_test_y    = test_set_y[idx,]
+
+        labels = numpy.zeros((10,))
+        for la in range(10):
+            labels[la] = numpy.sum(sub_test_y == la)
+        labels_set.append(labels)
+
+        right += numpy.max(labels)
+        pred_set.append(numpy.argmax(labels))
+
+    acc = right / len(test_set_x)
+    print acc
+    print pred_set
+
+    # _count = 0
+    # test_set_x = numpy.transpose(test_set_x, (0, 2, 3, 1))
+    # for _id, _sample in zip(clustered, test_set_x):
+    #     _path = './sample/%d' % (_id)
+    #     if (check_path_exist(_path) is False):
+    #         create_path(_path)
+    #     _count += 1
+    #     _file_name = './sample/%d/%d.jpg' % (_id, _count)
+    #     cv2.imwrite(_file_name, _sample * 255)
+
     print ('------------------- Test Model (Done) -------------------')
 
 if __name__ == '__main__':
